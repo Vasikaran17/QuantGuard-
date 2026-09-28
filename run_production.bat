@@ -1,0 +1,29 @@
+@echo off
+echo ========================================================
+echo   QUANTGUARD // QUANTUM DIGITAL SIGNATURE DEFENSE
+echo   Building and Launching Unified Production Service...
+echo ========================================================
+
+echo.
+echo [1/3] Building React Frontend Bundle...
+cd frontend
+call npm run build
+if %errorlevel% neq 0 (
+    echo Error building frontend. Please check npm logs.
+    pause
+    exit /b %errorlevel%
+)
+cd ..
+
+echo.
+echo [2/3] Checking Backend Database & Dependencies...
+cd backend
+python -m pip install -r requirements.txt
+python seed_data.py
+
+echo.
+echo [3/3] Starting Unified Production Server on http://localhost:8000 ...
+echo [INFO] Serving React Frontend UI and FastAPI REST Endpoints concurrently.
+echo [INFO] Demo Credentials: admin / QuantGuard@2026
+echo.
+uvicorn main:app --host 0.0.0.0 --port 8000

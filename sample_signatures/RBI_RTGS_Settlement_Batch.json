@@ -1,0 +1,14 @@
+{
+  "qds_protocol": "Teleportation-QDS-Pauli-XYZ",
+  "batch_reference": "RTGS_SETTLEMENT_2026_BATCH_771",
+  "clearing_bank": "RESERVE_BANK_OF_INDIA",
+  "signer_id": "RBI-QUANTUM-VAULT-04",
+  "settlement_amount_inr": 4850000000.00,
+  "currency": "INR",
+  "value_date": "2026-09-28",
+  "quantum_telemetry": {
+    "entanglement_link": "FIBER-QKD-MUMBAI-DELHI-01",
+    "pauli_tomography_verified": true,
+    "fidelity_score": 0.961
+  }
+}

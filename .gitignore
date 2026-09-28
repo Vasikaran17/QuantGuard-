@@ -1,0 +1,33 @@
+# Node / Frontend Dependencies
+node_modules/
+frontend/node_modules/
+
+# Production builds
+frontend/dist/
+frontend/dist-ssr/
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+backend/__pycache__/
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Database journals and locks (keep seedable sqlite or let seed script create it)
+backend/*.db-journal
+backend/*.db-wal
+backend/*.db-shm
+
+# System & IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+.system_generated/
+.gemini/
