@@ -1,19 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", "Helvetica Neue", Arial, sans-serif;
   color-scheme: dark;
+  --bg-canvas: #0C1017;
+  --bg-surface: #121824;
+  --bg-surface-elevated: #182232;
+  --bg-surface-sunken: #090D14;
+  --border-subtle: #1F2B3D;
+  --border-strong: #2D3D56;
 }
 
 body {
   margin: 0;
   padding: 0;
-  background-color: #0A0E17;
+  background-color: var(--bg-canvas);
   color: #E2E8F0;
   min-height: 100vh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
 }
 
 #root {
@@ -23,44 +30,60 @@ body {
   flex-direction: column;
 }
 
-/* Custom Scrollbar */
+/* Custom Refined Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0B0F19;
+  background: #0C1017;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1E293B;
+  background: #1F2B3D;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #2D3D56;
 }
 
-/* Authentic Enterprise Card & Surface Styles */
-.panel-card {
-  background-color: #0F172A;
-  border: 1px solid #1E293B;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.25);
+/* Focus Visibility & Accessibility */
+:focus-visible {
+  outline: 2px solid #0284C7;
+  outline-offset: 2px;
 }
 
-.panel-card-hover {
-  transition: all 0.15s ease-in-out;
+/* Handcrafted Surface Classes */
+.surface-card {
+  background-color: #121824;
+  border: 1px solid #1F2B3D;
+  border-radius: 10px;
 }
 
-.panel-card-hover:hover {
-  border-color: #334155;
-  background-color: #111C33;
+.surface-card-hover {
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
 }
 
-.panel-subtle {
-  background-color: #0B1120;
-  border: 1px solid #1E293B;
+.surface-card-hover:hover {
+  border-color: #2D3D56;
+  background-color: #151D2C;
+}
+
+.surface-well {
+  background-color: #090D14;
+  border: 1px solid #1A2433;
+  border-radius: 8px;
+}
+
+/* Tactile Button Utilities */
+.btn-tactile {
+  transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-tactile:active {
+  transform: scale(0.98);
 }
 
 /* Technical Monospace Elements */

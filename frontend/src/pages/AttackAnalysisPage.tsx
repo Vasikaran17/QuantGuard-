@@ -1,157 +1,176 @@
 import React from 'react';
 import { 
+  Flame, 
   ShieldAlert, 
   CopyX, 
   UserX, 
   RotateCcw, 
   Lock, 
-  CheckCircle2, 
-  AlertTriangle,
-  Atom,
-  Cpu,
-  Fingerprint,
-  ShieldCheck,
-  ChevronRight
+  Clock,
+  Layers,
+  ArrowUpRight
 } from 'lucide-react';
+import { useVerification } from '../context/VerificationContext';
 
 export const AttackAnalysisPage: React.FC = () => {
-  const attackVectors = [
-    {
-      id: 'SIGNATURE_FORGERY',
-      name: 'Signature Forgery (Adversary Eve)',
-      threatLevel: 'Critical',
-      color: 'rose',
-      icon: CopyX,
-      quantumMechanism: 'Quantum No-Cloning Theorem & Pauli Disturbance',
-      description: 'An attacker attempts to forge a valid quantum signature state without possession of Alice\'s private basis sequence. When Eve intercepts and measures states, quantum complementarity forces wave function collapse.',
-      detectionMetric: 'Measurement Mismatch Rate (QBER) jumps from baseline ~0.04 to > 0.32 across X, Y, Z bases, decisively tripping the 5σ threshold (0.1120).',
-      mitigation: 'Automated rejection of verification session; quantum state token instantly invalidated; security operations alert triggered.',
-      thresholdStatus: 'Observed: 0.342 vs Cutoff: 0.112'
-    },
-    {
-      id: 'IMPERSONATION',
-      name: 'Signer Impersonation Attack (Mallory)',
-      threatLevel: 'High',
-      color: 'amber',
-      icon: UserX,
-      quantumMechanism: 'Entangled Basis Alignment & Identity Proof',
-      description: 'A malicious entity Mallory attempts to impersonate legitimate signer Alice by submitting forged public parameters or an altered identity vector.',
-      detectionMetric: 'Systematic basis key mismatch (> 40% error) when receiver decrypts quantum states with Alice\'s registered public basis seed.',
-      mitigation: 'Identity certificate verification failure; signer public key blacklisted; immediate telemetry logging for audit.',
-      thresholdStatus: 'Observed: 0.414 vs Cutoff: 0.112'
-    },
-    {
-      id: 'REPLAY_ATTACK',
-      name: 'Quantum Replay Attack (Nonce Collision)',
-      threatLevel: 'High',
-      color: 'amber',
-      icon: RotateCcw,
-      quantumMechanism: 'Temporal Nonce Vault & State Expiration',
-      description: 'An adversary intercepts a previously verified quantum signature and attempts to re-transmit it to authorize an unauthorized action or replay a financial settlement transaction.',
-      detectionMetric: 'Instant collision lookup in SQLite used_nonces table; quantum state expiration token exceeds maximum validity window.',
-      mitigation: 'Deterministic pre-measurement denial; immediate drop of channel teleportation packet.',
-      thresholdStatus: 'Instant rejection via Nonce Vault'
-    },
-    {
-      id: 'UNAUTHORIZED_VERIFIER',
-      name: 'Unauthorized Rogue Verifier Node',
-      threatLevel: 'High',
-      color: 'violet',
-      icon: Lock,
-      quantumMechanism: 'Clearance-Enforced Channel Access Control',
-      description: 'An unverified gateway or blacklisted node requests verification of classified quantum states without holding Level-5 quantum decryption clearance.',
-      detectionMetric: 'Verifier ID check against authorized_verifiers database table; failure of active authorization handshake.',
-      mitigation: 'Channel cut-off; zero-knowledge audit trail record added; telemetry flagged as unauthorized verifier.',
-      thresholdStatus: 'Clearance Access Denied'
-    }
-  ];
+  const { dashboardStats, history } = useVerification();
+
+  // Filter only malicious / threat events from history
+  const attackItems = history.filter((item) => item.status === 'THREAT DETECTED');
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold text-white tracking-tight">
-              Threat Intelligence & Attack Modeling
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-[#0F172A] border border-[#1E293B] shadow-xl">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+            <Flame className="w-6 h-6 text-rose-400" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-white tracking-tight">
+              Adversarial Attack Analysis & Forensic Ledger
             </h1>
-            <span className="text-xs font-medium px-2 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30">
-              Eavesdropping Defense
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Empirical analysis of adversarial vectors mitigated by teleportation-based QDS protocols
-          </p>
-        </div>
-      </div>
-
-      {/* Physics vs Classical Comparison Callout */}
-      <div className="bg-[#0F172A] rounded-xl p-5 border border-blue-500/30 shadow-sm">
-        <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-lg bg-blue-600/15 border border-blue-500/40 flex items-center justify-center text-blue-400 shrink-0">
-            <Atom className="w-5 h-5" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-white">
-              Information-Theoretic Security vs Classical Computational Hardness
-            </h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Unlike classical asymmetric schemes (RSA, DSA, ECDSA) which are mathematically broken by Shor’s algorithm on quantum computers, 
-              <strong> Quantum Digital Signatures (QDS)</strong> derive their security directly from the fundamental laws of quantum physics: the 
-              <em> Quantum No-Cloning Theorem</em> and <em>Heisenberg’s Complementarity Principle</em>. Any adversary attempting to intercept or copy the signature states 
-              irreversibly collapses the Pauli basis measurements, driving the Quantum Bit Error Rate (QBER) far beyond the calibrated 5-sigma decision boundary.
+            <p className="text-xs text-slate-400 mt-0.5">
+              Deep-dive telemetry into intercepted forgery attempts, identity spoofing, and nonce replay vectors
             </p>
           </div>
         </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400">Total Intercepts:</span>
+          <span className="font-mono text-sm font-bold text-rose-400 px-3 py-1 rounded bg-[#0A0E17] border border-[#1E293B]">
+            {dashboardStats.threatsCount} Threats
+          </span>
+        </div>
       </div>
 
-      {/* Attack Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {attackVectors.map((atk) => {
-          const Icon = atk.icon;
-          return (
-            <div key={atk.id} className="bg-[#0F172A] rounded-xl p-5 border border-slate-800 space-y-4 flex flex-col justify-between shadow-sm">
-              <div>
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-[#0B1120] border border-slate-700 flex items-center justify-center text-rose-400">
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="text-xs font-semibold text-white">{atk.name}</h3>
-                      <span className="text-[11px] text-blue-400">{atk.quantumMechanism}</span>
-                    </div>
-                  </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${
-                    atk.threatLevel === 'Critical' 
-                      ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30' 
-                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                  }`}>
-                    {atk.threatLevel}
-                  </span>
-                </div>
+      {/* Top 5 Attack Counters Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <div className="p-4 rounded-xl bg-[#0F172A] border border-[#1E293B] space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Total Threats</span>
+            <ShieldAlert className="w-4 h-4 text-rose-400" />
+          </div>
+          <div className="text-2xl font-bold font-mono text-white">
+            {dashboardStats.threatsCount}
+          </div>
+          <span className="text-[10px] text-slate-400 block">All vectors combined</span>
+        </div>
 
-                <div className="mt-3 space-y-2.5 text-xs">
-                  <p className="text-slate-300 leading-relaxed">
-                    {atk.description}
-                  </p>
-                  
-                  <div className="p-3 rounded-lg bg-[#0B1120] border border-slate-800 space-y-1">
-                    <span className="text-[10px] text-slate-400 font-medium uppercase block">Detection Mechanism:</span>
-                    <p className="text-slate-200 text-xs leading-relaxed">{atk.detectionMetric}</p>
-                  </div>
-                </div>
-              </div>
+        <div className="p-4 rounded-xl bg-[#0F172A] border border-[#1E293B] space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Forgery</span>
+            <CopyX className="w-4 h-4 text-rose-400" />
+          </div>
+          <div className="text-2xl font-bold font-mono text-rose-400">
+            {dashboardStats.attackBreakdown.SIGNATURE_FORGERY}
+          </div>
+          <span className="text-[10px] text-slate-400 block">QBER threshold breaches</span>
+        </div>
 
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-                <span className="text-slate-400">Operational Mitigation:</span>
-                <span className="text-emerald-400 font-medium flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Intercepted & Quarantined
-                </span>
-              </div>
-            </div>
-          );
-        })}
+        <div className="p-4 rounded-xl bg-[#0F172A] border border-[#1E293B] space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Impersonation</span>
+            <UserX className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="text-2xl font-bold font-mono text-amber-400">
+            {dashboardStats.attackBreakdown.IMPERSONATION}
+          </div>
+          <span className="text-[10px] text-slate-400 block">Basis key mismatches</span>
+        </div>
+
+        <div className="p-4 rounded-xl bg-[#0F172A] border border-[#1E293B] space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Replay Attempts</span>
+            <RotateCcw className="w-4 h-4 text-purple-400" />
+          </div>
+          <div className="text-2xl font-bold font-mono text-purple-400">
+            {dashboardStats.attackBreakdown.REPLAY_ATTACK}
+          </div>
+          <span className="text-[10px] text-slate-400 block">Nonce vault collisions</span>
+        </div>
+
+        <div className="p-4 rounded-xl bg-[#0F172A] border border-[#1E293B] space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Unauthorized</span>
+            <Lock className="w-4 h-4 text-sky-400" />
+          </div>
+          <div className="text-2xl font-bold font-mono text-sky-400">
+            {dashboardStats.attackBreakdown.UNAUTHORIZED_VERIFIER}
+          </div>
+          <span className="text-[10px] text-slate-400 block">Clearance token failures</span>
+        </div>
+      </div>
+
+      {/* DETAILED ATTACK TABLE */}
+      <div className="p-5 rounded-2xl bg-[#0F172A] border border-[#1E293B] shadow-xl space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-[#1E293B]">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+            <Clock className="w-4 h-4 text-cyan-400" />
+            DETAILED ADVERSARIAL ATTACK LEDGER
+          </h2>
+          <span className="text-[11px] font-mono text-slate-400">
+            Filtered: {attackItems.length} Blocked Intrusion Events
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs font-mono">
+            <thead>
+              <tr className="border-b border-[#1E293B] text-slate-400 uppercase text-[10px]">
+                <th className="py-2.5 px-3">Attack ID</th>
+                <th className="py-2.5 px-3">Attack Type</th>
+                <th className="py-2.5 px-3">Detection Signal</th>
+                <th className="py-2.5 px-3 text-right">Mismatch Rate</th>
+                <th className="py-2.5 px-3 text-right">Attack Probability</th>
+                <th className="py-2.5 px-3 text-right">Confidence</th>
+                <th className="py-2.5 px-3">Timestamp</th>
+                <th className="py-2.5 px-3 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1E293B]/60 text-slate-300">
+              {attackItems.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                    No threat events recorded in current session. Run a demo attack or upload forged payload to test.
+                  </td>
+                </tr>
+              ) : (
+                attackItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-[#1E293B]/40 transition-colors">
+                    <td className="py-3 px-3 font-bold text-cyan-400">{item.requestId}</td>
+                    <td className="py-3 px-3">
+                      <span className="font-bold text-rose-400">{item.threatType}</span>
+                    </td>
+                    <td className="py-3 px-3 text-slate-400 text-[11px] max-w-xs truncate" title={item.result?.whyDecision}>
+                      {item.threatType === 'Signature Forgery' ? `Mismatch Rate (${item.mismatchRate}%) > Cutoff (20%)` :
+                       item.threatType === 'Impersonation' ? `Identity mismatch ('${item.sender}' != '${item.claimedIdentity}')` :
+                       item.threatType === 'Replay Attack' ? `Reused Nonce (${item.nonce}) in Temporal Vault` :
+                       'Unauthorized Verifier Clearance Flag'}
+                    </td>
+                    <td className="py-3 px-3 text-right font-bold text-rose-400">
+                      {item.mismatchRate}%
+                    </td>
+                    <td className="py-3 px-3 text-right font-bold text-amber-400">
+                      {item.attackProbability}%
+                    </td>
+                    <td className="py-3 px-3 text-right text-cyan-400">
+                      {item.confidence}%
+                    </td>
+                    <td className="py-3 px-3 text-slate-400 text-[11px]">
+                      {new Date(item.timestamp).toLocaleTimeString()}
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-800">
+                        {item.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

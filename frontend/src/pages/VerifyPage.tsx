@@ -1,636 +1,939 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useMode } from '../context/ModeContext';
 import { 
   FileCheck2, 
   UploadCloud, 
-  PlayCircle, 
+  Copy, 
+  Download, 
+  Check, 
+  AlertTriangle, 
   ShieldCheck, 
   ShieldAlert, 
-  FilePlus, 
-  FileText, 
-  AlertCircle, 
-  CheckCircle2, 
-  ArrowRight,
-  Database,
-  Hash,
-  Lock,
-  Layers,
+  Fingerprint, 
+  Cpu, 
+  RotateCcw, 
+  Layers, 
+  Sliders, 
+  FileText,
+  AlertCircle,
   Sparkles,
-  Info
+  Info,
+  Clock,
+  KeyRound,
+  CheckCircle2,
+  XCircle,
+  Eye
 } from 'lucide-react';
-import { DemoScenario, VerificationResult } from '../types';
+import { useMode } from '../context/ModeContext';
+import { useVerification } from '../context/VerificationContext';
 import { 
-  getDemoScenariosApi, 
-  verifyDemoApi, 
-  verifyFileApi, 
-  registerSignatureApi,
-  getVerifiersApi 
-} from '../services/api';
+  VerificationInput, 
+  DetailedVerificationResult, 
+  QuantumStateSymbol, 
+  MeasurementBasisType, 
+  AuthorizationStatusType 
+} from '../types';
+import { generateDemoScenario } from '../services/quantumEngine';
 
-interface VerifyPageProps {
-  onOpenDrawer: (result: VerificationResult) => void;
-}
+export const VerifyPage: React.FC = () => {
+  const { isDemoMode } = useMode();
+  const { 
+    settings, 
+    updateSettings, 
+    runVerificationAction, 
+    latestResult, 
+    history 
+  } = useVerification();
 
-export const VerifyPage: React.FC<VerifyPageProps> = ({ onOpenDrawer }) => {
-  const { isDemoMode, toggleDemoMode } = useMode();
-  
-  // Demo Mode state
-  const [scenarios, setScenarios] = useState<DemoScenario[]>([]);
-  const [selectedScenario, setSelectedScenario] = useState<string>('LEGITIMATE');
-  const [verifiers, setVerifiers] = useState<any[]>([]);
-  const [selectedVerifier, setSelectedVerifier] = useState<string>('VERIFIER-BOB-DEF-01');
-  const [isVerifying, setIsVerifying] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Form State
+  const [requestId, setRequestId] = useState('');
+  const [senderIdentity, setSenderIdentity] = useState('');
+  const [claimedIdentity, setClaimedIdentity] = useState('');
+  const [authorizationStatus, setAuthorizationStatus] = useState<AuthorizationStatusType>('AUTHORIZED');
+  const [quantumState, setQuantumState] = useState<QuantumStateSymbol>('|0⟩');
+  const [measurementBasis, setMeasurementBasis] = useState<MeasurementBasisType>('Z');
+  const [nonce, setNonce] = useState('');
+  const [measurementSamples, setMeasurementSamples] = useState(16);
+  const [expectedPattern, setExpectedPattern] = useState('0 1 0 1 0 1 0 1 1 0 1 0 0 1 1 0');
+  const [observedPattern, setObservedPattern] = useState('0 1 0 1 0 1 0 1 1 0 1 0 0 1 1 0');
+  const [statisticalThreshold, setStatisticalThreshold] = useState(settings.statisticalThreshold || 20);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(settings.confidenceThreshold || 85);
 
-  // Live Mode state
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [signerId, setSignerId] = useState<string>('ALICE-QDS-ROOT-01');
-  const [customNonce, setCustomNonce] = useState<string>('');
-  const [isDragging, setIsDragging] = useState<boolean>(false);
+  // File Upload State
+  const [fileName, setFileName] = useState('MOD_Tactical_Order_904.sig');
+  const [fileType, setFileType] = useState('application/octet-stream');
+  const [fileSize, setFileSize] = useState(1450);
+  const [uploadTime, setUploadTime] = useState(new Date().toLocaleTimeString());
+  const [fileContent, setFileContent] = useState('');
+  const [fileStatus, setFileStatus] = useState<'READY FOR ANALYSIS' | 'ANALYSIS COMPLETE'>('READY FOR ANALYSIS');
+  const [isDragging, setIsDragging] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [activeScenario, setActiveScenario] = useState<string>('NORMAL');
+  const [isVerifying, setIsVerifying] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Register signature tab
-  const [activeTab, setActiveTab] = useState<'VERIFY' | 'REGISTER'>('VERIFY');
-  const [regFile, setRegFile] = useState<File | null>(null);
-  const [regSignerId, setRegSignerId] = useState<string>('ALICE-QDS-ROOT-01');
-  const [regDescription, setRegDescription] = useState<string>('Enrolled reference contract');
-  const [regSuccess, setRegSuccess] = useState<string | null>(null);
-  const [isRegistering, setIsRegistering] = useState<boolean>(false);
-  const regFileInputRef = useRef<HTMLInputElement>(null);
-
+  // Sync settings when changed in Settings tab
   useEffect(() => {
-    async function loadConfig() {
+    setStatisticalThreshold(settings.statisticalThreshold);
+    setConfidenceThreshold(settings.confidenceThreshold);
+  }, [settings]);
+
+  // When DEMO MODE changes:
+  useEffect(() => {
+    if (isDemoMode) {
+      loadScenario('NORMAL');
+    } else {
+      // In Live Mode, fields are empty by default
+      resetToLiveMode();
+    }
+  }, [isDemoMode]);
+
+  const resetToLiveMode = () => {
+    setRequestId('');
+    setSenderIdentity('');
+    setClaimedIdentity('');
+    setAuthorizationStatus('AUTHORIZED');
+    setQuantumState('|0⟩');
+    setMeasurementBasis('Z');
+    setNonce('');
+    setMeasurementSamples(16);
+    setExpectedPattern('');
+    setObservedPattern('');
+    setFileName('');
+    setFileContent('');
+    setFileSize(0);
+    setFileType('');
+    setFileStatus('READY FOR ANALYSIS');
+  };
+
+  const loadScenario = (scenario: 'NORMAL' | 'FORGERY' | 'IMPERSONATION' | 'REPLAY' | 'UNAUTHORIZED') => {
+    setActiveScenario(scenario);
+    const demoData = generateDemoScenario(scenario, history);
+    
+    setRequestId(demoData.requestId);
+    setSenderIdentity(demoData.senderIdentity);
+    setClaimedIdentity(demoData.claimedIdentity);
+    setAuthorizationStatus(demoData.authorizationStatus);
+    setQuantumState(demoData.quantumState);
+    setMeasurementBasis(demoData.measurementBasis);
+    setNonce(demoData.nonce);
+    setMeasurementSamples(demoData.measurementSamples);
+    setExpectedPattern(demoData.expectedPattern);
+    setObservedPattern(demoData.observedPattern);
+    setFileName(demoData.fileName || 'quantum_signature.sig');
+    setFileContent(demoData.fileContent || '');
+    setFileSize(demoData.fileSize || 1200);
+    setFileType(demoData.fileType || 'application/json');
+    setUploadTime(demoData.uploadTime || new Date().toLocaleTimeString());
+    setFileStatus('READY FOR ANALYSIS');
+  };
+
+  // Handle Drag & Drop / File Upload
+  const handleFileSelect = (file: File) => {
+    if (!file) return;
+    setFileName(file.name);
+    setFileSize(file.size);
+    setFileType(file.type || 'text/plain');
+    setUploadTime(new Date().toLocaleTimeString());
+    setFileStatus('READY FOR ANALYSIS');
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      setFileContent(content);
+
+      // Attempt parsing if JSON to auto-populate fields
       try {
-        const [scRes, verRes] = await Promise.all([
-          getDemoScenariosApi(),
-          getVerifiersApi(),
-        ]);
-        setScenarios(scRes.scenarios);
-        setVerifiers(verRes.verifiers);
+        const parsed = JSON.parse(content);
+        if (parsed.requestId) setRequestId(parsed.requestId);
+        if (parsed.senderIdentity) setSenderIdentity(parsed.senderIdentity);
+        if (parsed.claimedIdentity) setClaimedIdentity(parsed.claimedIdentity);
+        if (parsed.nonce) setNonce(parsed.nonce);
+        if (parsed.expectedPattern) setExpectedPattern(parsed.expectedPattern);
+        if (parsed.observedPattern) setObservedPattern(parsed.observedPattern);
+        if (parsed.quantumState) setQuantumState(parsed.quantumState);
+        if (parsed.authorizationStatus) setAuthorizationStatus(parsed.authorizationStatus);
       } catch (err) {
-        console.error('Failed to load verify configuration:', err);
+        // Plain text fallback - keep raw content preview
       }
-    }
-    loadConfig();
-  }, []);
-
-  const currentScenarioObj = scenarios.find((s) => s.id === selectedScenario);
-
-  // Handle Demo Verification
-  const handleRunDemoVerification = async () => {
-    setErrorMsg(null);
-    setIsVerifying(true);
-    try {
-      const res = await verifyDemoApi(selectedScenario, selectedVerifier);
-      onOpenDrawer(res);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Demo verification execution failed.');
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  // Handle Live File Verification
-  const handleRunLiveVerification = async () => {
-    if (!uploadedFile) {
-      setErrorMsg('Please select or drop a signature file to verify.');
-      return;
-    }
-    setErrorMsg(null);
-    setIsVerifying(true);
-    try {
-      const res = await verifyFileApi(uploadedFile, selectedVerifier, signerId, customNonce || undefined);
-      onOpenDrawer(res);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'File verification execution failed.');
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  // Handle File Drop
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
+    };
+    reader.readAsText(file);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setUploadedFile(e.dataTransfer.files[0]);
+      handleFileSelect(e.dataTransfer.files[0]);
     }
   };
 
-  // Handle Register Signature
-  const handleRegisterSignature = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!regFile) {
-      setErrorMsg('Please provide a file to register as legitimate signature.');
-      return;
-    }
-    setErrorMsg(null);
-    setRegSuccess(null);
-    setIsRegistering(true);
-    try {
-      const res = await registerSignatureApi(regFile, regSignerId, regDescription);
-      setRegSuccess(`Successfully enrolled "${res.file_name}" into quantum registry (Doc ID: ${res.doc_id})`);
-      setRegFile(null);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Registration failed.');
-    } finally {
-      setIsRegistering(false);
-    }
+  // Run Verification
+  const handleRunVerification = () => {
+    setIsVerifying(true);
+
+    const inputData: VerificationInput = {
+      requestId: requestId || `REQ-LIVE-${Date.now().toString().slice(-6)}`,
+      senderIdentity: senderIdentity || 'ANONYMOUS-NODE',
+      claimedIdentity: claimedIdentity || senderIdentity || 'ANONYMOUS-NODE',
+      authorizationStatus,
+      quantumState,
+      measurementBasis,
+      nonce: nonce || `NONCE-AUTO-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+      measurementSamples: measurementSamples || 16,
+      expectedPattern: expectedPattern || '0 1 0 1 0 1 0 1',
+      observedPattern: observedPattern || expectedPattern || '0 1 0 1 0 1 0 1',
+      statisticalThreshold,
+      confidenceThreshold,
+      fileName: fileName || 'quantum_signature.sig',
+      fileContent,
+      fileSize,
+      fileType,
+      uploadTime
+    };
+
+    setTimeout(() => {
+      runVerificationAction(inputData);
+      setFileStatus('ANALYSIS COMPLETE');
+      setIsVerifying(false);
+    }, 280);
+  };
+
+  const copyContentToClipboard = () => {
+    if (!fileContent) return;
+    navigator.clipboard.writeText(fileContent);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const downloadSignatureFile = () => {
+    if (!fileContent) return;
+    const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName || 'quantum_signature.sig';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold text-white tracking-tight">
-              Quantum Signature Verification
-            </h1>
-            <span className="text-xs font-medium px-2 py-0.5 rounded bg-blue-600/15 text-blue-300 border border-blue-500/30">
-              Tomography Engine
+      {/* Top Banner based on Global Demo Mode state */}
+      {isDemoMode ? (
+        <div className="p-3.5 rounded-xl bg-cyan-950/40 border border-cyan-800/60 flex items-center justify-between text-xs text-cyan-200 shadow-sm shadow-cyan-950/20">
+          <div className="flex items-center gap-2.5">
+            <span className="p-1 rounded bg-cyan-500/20 text-cyan-300">
+              <Sparkles className="w-4 h-4" />
+            </span>
+            <div>
+              <strong className="font-semibold text-white">Demo Mode Active</strong> — Test values are being generated for demonstration.
+              <span className="block text-[11px] text-cyan-300/80">Select any scenario below to populate realistic test telemetry and modify them freely.</span>
+            </div>
+          </div>
+          <span className="px-2.5 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-mono text-[11px] font-semibold shrink-0">
+            DEMO / TEST DATA
+          </span>
+        </div>
+      ) : (
+        <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-700/80 flex items-center justify-between text-xs text-slate-300 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <span className="p-1 rounded bg-slate-800 text-slate-300">
+              <Info className="w-4 h-4" />
+            </span>
+            <div>
+              <strong className="font-semibold text-white">Live Verification Mode</strong> — Enter verification data manually or upload an authentic signature payload.
+              <span className="block text-[11px] text-slate-400">Local prototype verification workflow. Fields are unpopulated by default.</span>
+            </div>
+          </div>
+          <span className="px-2.5 py-1 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono text-[11px] font-semibold shrink-0">
+            MANUAL / LIVE INGEST
+          </span>
+        </div>
+      )}
+
+      {/* DEMO SCENARIO SELECTOR (Visible when DEMO MODE = ON) */}
+      {isDemoMode && (
+        <div className="p-4 rounded-xl bg-[#0F172A] border border-[#1E293B] space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold tracking-wider uppercase text-slate-300 flex items-center gap-2">
+              <Cpu className="w-3.5 h-3.5 text-cyan-400" />
+              TEST SCENARIOS (DEMO DATA GENERATOR)
+            </span>
+            <span className="text-[11px] text-slate-400">
+              Click any scenario to simulate dynamic quantum attacks
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Conduct Pauli basis state reconstruction and evaluate against the 5σ statistical threshold
-          </p>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+            {[
+              { id: 'NORMAL', label: 'Normal Verification', desc: 'Valid State, Nominal Noise', color: 'hover:border-emerald-500/50 hover:bg-emerald-500/10' },
+              { id: 'FORGERY', label: 'Signature Forgery', desc: 'Adversary Eve, High QBER', color: 'hover:border-rose-500/50 hover:bg-rose-500/10' },
+              { id: 'IMPERSONATION', label: 'Impersonation', desc: 'Identity Misalignment', color: 'hover:border-amber-500/50 hover:bg-amber-500/10' },
+              { id: 'REPLAY', label: 'Replay Attack', desc: 'Duplicate Nonce Collision', color: 'hover:border-purple-500/50 hover:bg-purple-500/10' },
+              { id: 'UNAUTHORIZED', label: 'Unauthorized Request', desc: 'Invalid Clearance Token', color: 'hover:border-sky-500/50 hover:bg-sky-500/10' },
+            ].map((sc) => {
+              const isActive = activeScenario === sc.id;
+              return (
+                <button
+                  key={sc.id}
+                  onClick={() => loadScenario(sc.id as any)}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    isActive 
+                      ? 'bg-cyan-500/15 border-cyan-500 text-white shadow-sm shadow-cyan-500/20' 
+                      : `bg-[#0A0E17] border-[#1E293B] text-slate-300 ${sc.color}`
+                  }`}
+                >
+                  <div className="font-semibold text-xs leading-snug">{sc.label}</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5 truncate">{sc.desc}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* MAIN TWO-COLUMN LAYOUT */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* ========================================================
+            LEFT COLUMN — VERIFICATION INPUT & CONTROLS (5 cols)
+            ======================================================== */}
+        <div className="lg:col-span-5 space-y-5">
+          <div className="p-5 rounded-2xl bg-[#0F172A] border border-[#1E293B] shadow-xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-[#1E293B]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                  <FileCheck2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-white tracking-tight">Quantum Signature Verification</h2>
+                  <p className="text-[11px] text-slate-400">Teleportation QDS protocol inspection gate</p>
+                </div>
+              </div>
+              {isDemoMode && (
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/40">
+                  Demo/Test Data
+                </span>
+              )}
+            </div>
+
+            {/* SECTION 1: REQUEST INFORMATION */}
+            <div className="space-y-3">
+              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-cyan-400 flex items-center gap-1.5">
+                <KeyRound className="w-3 h-3" />
+                REQUEST INFORMATION
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-300 mb-1">Request ID</label>
+                  <input
+                    type="text"
+                    value={requestId}
+                    onChange={(e) => setRequestId(e.target.value)}
+                    placeholder="REQ-2026-XXXX"
+                    className="w-full px-3 py-2 bg-[#0A0E17] border border-[#1E293B] rounded-lg text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-300 mb-1">Authorization Status</label>
+                  <select
+                    value={authorizationStatus}
+                    onChange={(e) => setAuthorizationStatus(e.target.value as AuthorizationStatusType)}
+                    className="w-full px-3 py-2 bg-[#0A0E17] border border-[#1E293B] rounded-lg text-xs font-mono text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
+                  >
+                    <option value="AUTHORIZED">AUTHORIZED</option>
+                    <option value="PENDING">PENDING</option>
+                    <option value="UNAUTHORIZED">UNAUTHORIZED</option>
+                    <option value="REVOKED">REVOKED</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-300 mb-1">Sender Identity</label>
+                  <input
+                    type="text"
+                    value={senderIdentity}
+                    onChange={(e) => setSenderIdentity(e.target.value)}
+                    placeholder="ALICE-QDS-NODE-01"
+                    className="w-full px-3 py-2 bg-[#0A0E17] border border-[#1E293B] rounded-lg text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-300 mb-1">Claimed Identity</label>
+                  <input
+                    type="text"
+                    value={claimedIdentity}
+                    onChange={(e) => setClaimedIdentity(e.target.value)}
+                    placeholder="ALICE-QDS-NODE-01"
+                    className="w-full px-3 py-2 bg-[#0A0E17] border border-[#1E293B] rounded-lg text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 2: QUANTUM SIGNATURE DATA */}
+            <div className="space-y-3 pt-2 border-t border-[#1E293B]">
+              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-cyan-400 flex items-center gap-1.5">
+                <Cpu className="w-3 h-3" />
+                QUANTUM SIGNATURE DATA
+              </span>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-300 mb-1">Quantum State</label>
+                  <select
+                    value={quantumState}
+                    onChange={(e) => setQuantumState(e.target.value as QuantumStateSymbol)}
+                    className="w-full px-3 py-2 bg-[#0A0E17] border border-[#1E293B] rounded-lg text-xs font-mono text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
+                  >
+                    <option value="|0⟩">|0⟩ (Computational 0)</option>
+                    <option value="|1⟩">|1⟩ (Computational 1)</option>
+                    <option value="|+⟩">|+⟩ (Hadamard +)</option>
+                    <option value="|−⟩">|−⟩ (Hadamard -)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-300 mb-1">Measurement Basis</label>
+                  <select
+                    value={measurementBasis}
+                    onChange={(e) => setMeasurementBasis(e.target.value as MeasurementBasisType)}
+                    className="w-full px-3 py-2 bg-[#0A0E17] border border-[#1E293B] rounded-lg text-xs font-mono text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
+                  >
+                    <option value="Z">Z Basis (Computational)</option>
+                    <option value="X">X Basis (Hadamard)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                  Nonce (Freshness / Replay Token)
+                </label>
+                <input
+                  type="text"
+                  value={nonce}
+                  onChange={(e) => setNonce(e.target.value)}
+                  placeholder="NONCE-QDS-XXXX"
+                  className="w-full px-3 py-2 bg-[#0A0E17] border border-[#1E293B] rounded-lg text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                  Expected Measurement Pattern (Binary Stream)
+                </label>
+                <input
+                  type="text"
+                  value={expectedPattern}
+                  onChange={(e) => setExpectedPattern(e.target.value)}
+                  placeholder="0 1 0 1 0 1 0 1 1 0 1 0 0 1 1 0"
+                  className="w-full px-3 py-2 bg-[#0A0E17] border border-[#1E293B] rounded-lg text-xs font-mono text-cyan-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500 tracking-wider"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                  Observed Measurement Pattern (Receiver Tomography)
+                </label>
+                <input
+                  type="text"
+                  value={observedPattern}
+                  onChange={(e) => setObservedPattern(e.target.value)}
+                  placeholder="0 1 0 1 0 1 0 1 1 0 1 0 0 1 1 0"
+                  className="w-full px-3 py-2 bg-[#0A0E17] border border-[#1E293B] rounded-lg text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 tracking-wider"
+                />
+              </div>
+            </div>
+
+            {/* SECTION 3: VERIFICATION SETTINGS */}
+            <div className="space-y-3 pt-2 border-t border-[#1E293B]">
+              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-cyan-400 flex items-center gap-1.5">
+                <Sliders className="w-3 h-3" />
+                VERIFICATION SETTINGS
+              </span>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-center justify-between text-[11px] text-slate-300 mb-1">
+                    <span>Statistical Threshold:</span>
+                    <span className="font-mono text-amber-400 font-bold">{statisticalThreshold}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="50"
+                    step="1"
+                    value={statisticalThreshold}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setStatisticalThreshold(val);
+                      updateSettings({ statisticalThreshold: val });
+                    }}
+                    className="w-full accent-cyan-500 cursor-pointer"
+                  />
+                  <span className="text-[10px] text-slate-400">Default: 20% (Cutoff for Forgery)</span>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between text-[11px] text-slate-300 mb-1">
+                    <span>Confidence Cutoff:</span>
+                    <span className="font-mono text-cyan-400 font-bold">{confidenceThreshold}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="50"
+                    max="99"
+                    step="1"
+                    value={confidenceThreshold}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setConfidenceThreshold(val);
+                      updateSettings({ confidenceThreshold: val });
+                    }}
+                    className="w-full accent-cyan-500 cursor-pointer"
+                  />
+                  <span className="text-[10px] text-slate-400">Target confidence level</span>
+                </div>
+              </div>
+            </div>
+
+            {/* RUN BUTTON */}
+            <button
+              onClick={handleRunVerification}
+              disabled={isVerifying}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-600 via-sky-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs uppercase tracking-wider transition-all duration-200 shadow-lg shadow-cyan-600/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {isVerifying ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <FileCheck2 className="w-4 h-4" />
+              )}
+              <span>RUN QUANTUM VERIFICATION</span>
+            </button>
+          </div>
         </div>
 
-        {/* Mode Switcher */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 text-xs bg-[#0F172A] border border-slate-800 px-3 py-1.5 rounded-lg shadow-sm">
-            <span className="text-slate-400">Mode:</span>
-            {isDemoMode ? (
-              <span className="text-blue-400 font-medium flex items-center gap-1">
-                <PlayCircle className="w-3.5 h-3.5" /> Interactive Scenarios
+        {/* ========================================================
+            RIGHT COLUMN — SIGNATURE FILE + EVIDENCE + RESULT (7 cols)
+            Occupies significant screen space as strictly required!
+            ======================================================== */}
+        <div className="lg:col-span-7 space-y-6">
+          {/* 1. SIGNATURE FILE UPLOAD & METADATA SECTION */}
+          <div className="p-5 rounded-2xl bg-[#0F172A] border border-[#1E293B] shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#1E293B]">
+              <div className="flex items-center gap-2">
+                <UploadCloud className="w-4 h-4 text-cyan-400" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                  Upload Digital Signature
+                </h3>
+              </div>
+              <span className="text-[10px] font-mono text-slate-400">
+                Formats: .json, .txt, .sig, .dat
               </span>
-            ) : (
-              <span className="text-emerald-400 font-medium flex items-center gap-1">
-                <UploadCloud className="w-3.5 h-3.5" /> Direct File Ingest
-              </span>
+            </div>
+
+            {/* Drag & Drop Area */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
+                isDragging
+                  ? 'border-cyan-400 bg-cyan-500/10'
+                  : 'border-[#1E293B] hover:border-cyan-500/50 hover:bg-[#0A0E17]/80 bg-[#0A0E17]/40'
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json,.txt,.sig,.dat"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleFileSelect(e.target.files[0]);
+                  }
+                }}
+              />
+              <UploadCloud className="w-8 h-8 mx-auto mb-2 text-cyan-400/80" />
+              <div className="text-xs font-semibold text-slate-200">
+                Upload Signature File
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Drag & Drop or <span className="text-cyan-400 underline font-medium">Browse from Computer</span>
+              </p>
+            </div>
+
+            {/* Metadata Bar */}
+            {fileName && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-xl bg-[#0A0E17] border border-[#1E293B] text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase">File Name</span>
+                  <span className="font-mono text-slate-200 font-semibold truncate block" title={fileName}>
+                    {fileName}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase">File Size</span>
+                  <span className="font-mono text-slate-200">{(fileSize / 1024).toFixed(2)} KB</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase">Upload Time</span>
+                  <span className="font-mono text-slate-200">{uploadTime}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase">File Status</span>
+                  <span className={`font-mono font-bold text-[11px] ${fileStatus === 'ANALYSIS COMPLETE' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {fileStatus}
+                  </span>
+                </div>
+              </div>
             )}
           </div>
 
-          <button
-            onClick={toggleDemoMode}
-            className="px-3 py-1.5 rounded-lg bg-[#0F172A] hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
-          >
-            Switch to {isDemoMode ? 'Live File Ingest' : 'Demo Scenarios'}
-          </button>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-slate-800">
-        <button
-          onClick={() => setActiveTab('VERIFY')}
-          className={`pb-2.5 px-4 text-xs font-medium flex items-center gap-2 border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'VERIFY'
-              ? 'border-blue-500 text-white font-semibold'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <FileCheck2 className="w-4 h-4 text-blue-400" />
-          <span>Verification Workbench</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('REGISTER')}
-          className={`pb-2.5 px-4 text-xs font-medium flex items-center gap-2 border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'REGISTER'
-              ? 'border-blue-500 text-white font-semibold'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Database className="w-4 h-4 text-blue-400" />
-          <span>Enroll Reference Signature</span>
-        </button>
-      </div>
-
-      {errorMsg && (
-        <div className="p-3.5 rounded-lg bg-rose-950/40 border border-rose-800/60 flex items-start gap-2.5 text-rose-300 text-xs">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
-      {regSuccess && (
-        <div className="p-3.5 rounded-lg bg-emerald-950/40 border border-emerald-800/60 flex items-start gap-2.5 text-emerald-300 text-xs">
-          <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
-          <span>{regSuccess}</span>
-        </div>
-      )}
-
-      {activeTab === 'VERIFY' && (
-        <>
-          {/* DEMO MODE VIEW */}
-          {isDemoMode ? (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left Config (7 cols) */}
-              <div className="lg:col-span-7 bg-[#0F172A] rounded-xl p-6 border border-slate-800 space-y-5 shadow-sm">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-white">
-                    <PlayCircle className="w-4 h-4 text-blue-400" />
-                    <span>Select Test Scenario</span>
-                  </div>
-                  <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                    Preloaded Vectors
-                  </span>
-                </div>
-
-                {/* Scenario Cards Grid */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-2.5">
-                    Operational Vector
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {scenarios.map((sc) => {
-                      const isSelected = selectedScenario === sc.id;
-                      const isLegit = sc.expected_verdict === 'LEGITIMATE';
-                      return (
-                        <div
-                          key={sc.id}
-                          onClick={() => setSelectedScenario(sc.id)}
-                          className={`p-3 rounded-lg border text-left cursor-pointer transition-all ${
-                            isSelected
-                              ? 'bg-blue-600/15 border-blue-500/50 shadow-xs'
-                              : 'bg-[#0B1120] border-slate-800 hover:border-slate-700 hover:bg-[#0E1528]'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-xs font-semibold text-white">
-                              {sc.label}
-                            </span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                              isLegit ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/40' : 'bg-rose-950 text-rose-400 border border-rose-800/40'
-                            }`}>
-                              {sc.expected_verdict}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
-                            {sc.description}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Verifier Node Selection */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Target Verifier Node
-                  </label>
-                  <select
-                    value={selectedVerifier}
-                    onChange={(e) => setSelectedVerifier(e.target.value)}
-                    className="w-full p-2.5 bg-[#0B1120] border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500 transition-colors"
-                  >
-                    {verifiers.map((v) => (
-                      <option key={v.verifier_id} value={v.verifier_id}>
-                        {v.verifier_id} ({v.name}) — {v.clearance_level}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Scenario Details Preview */}
-                {currentScenarioObj && (
-                  <div className="p-4 rounded-lg bg-[#0B1120] border border-slate-800 space-y-2 text-xs">
-                    <div className="flex items-center justify-between text-slate-300 font-medium">
-                      <span>Selected Payload Information</span>
-                      <span className="font-mono text-slate-400 text-[11px]">
-                        Target: {currentScenarioObj.sample_file}
-                      </span>
-                    </div>
-                    <p className="text-slate-400 text-xs leading-relaxed">
-                      {currentScenarioObj.description}
-                    </p>
-                    <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800 font-mono">
-                      <span>Signer: <strong className="text-blue-400">{currentScenarioObj.signer_id}</strong></span>
-                      <span>Expected Outcome: <strong className={currentScenarioObj.expected_verdict === 'LEGITIMATE' ? 'text-emerald-400' : 'text-rose-400'}>{currentScenarioObj.expected_verdict}</strong></span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Verification CTA */}
-                <button
-                  onClick={handleRunDemoVerification}
-                  disabled={isVerifying}
-                  className="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
-                >
-                  {isVerifying ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <FileCheck2 className="w-4 h-4" />
-                      <span>Execute Quantum Verification</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Right Protocol Overview (5 cols) */}
-              <div className="lg:col-span-5 bg-[#0F172A] rounded-xl p-6 border border-slate-800 space-y-4 shadow-sm">
-                <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wide flex items-center gap-2">
-                  <Hash className="w-4 h-4 text-blue-400" /> Quantum Protocol Specifications
+          {/* 2. FULL FILE PREVIEW / EVIDENCE PANEL */}
+          <div className="p-5 rounded-2xl bg-[#0F172A] border border-[#1E293B] shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#1E293B]">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-cyan-400" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                  SIGNATURE FILE CONTENT & FULL PREVIEW
                 </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={copyContentToClipboard}
+                  disabled={!fileContent}
+                  className="px-2.5 py-1 rounded-lg bg-[#1E293B] hover:bg-[#334155] text-slate-200 text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  title="Copy full content"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copied ? 'Copied' : 'Copy'}</span>
+                </button>
 
-                <div className="space-y-3 text-xs">
-                  <div className="p-3 rounded-lg bg-[#0B1120] border border-slate-800">
-                    <span className="text-slate-400 block text-[11px] mb-0.5">Verification Standard</span>
-                    <span className="text-white font-medium">Teleportation-Based QDS (Pauli X, Y, Z)</span>
-                    <p className="text-slate-400 text-[11px] mt-1 leading-relaxed">
-                      Eigenstate measurement across orthogonal and non-orthogonal bases to detect disturbance.
-                    </p>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-[#0B1120] border border-slate-800">
-                    <span className="text-slate-400 block text-[11px] mb-0.5">Calibrated 5σ Boundary</span>
-                    <span className="text-amber-400 font-mono font-medium">0.1120 QBER</span>
-                    <p className="text-slate-400 text-[11px] mt-1 leading-relaxed">
-                      Mismatch rates above 0.1120 indicate quantum state collapse caused by measurement or interception.
-                    </p>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-[#0B1120] border border-slate-800">
-                    <span className="text-slate-400 block text-[11px] mb-0.5">Quantum No-Cloning Theorem</span>
-                    <span className="text-emerald-400 font-medium">Information-Theoretic Security</span>
-                    <p className="text-slate-400 text-[11px] mt-1 leading-relaxed">
-                      An adversary cannot duplicate unknown quantum signature states without creating minimum 25% disturbance.
-                    </p>
-                  </div>
-                </div>
+                <button
+                  onClick={downloadSignatureFile}
+                  disabled={!fileContent}
+                  className="px-2.5 py-1 rounded-lg bg-[#1E293B] hover:bg-[#334155] text-slate-200 text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  title="Download signature file"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download</span>
+                </button>
               </div>
             </div>
-          ) : (
-            /* LIVE FILE UPLOAD VIEW */
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left Upload Form (7 cols) */}
-              <div className="lg:col-span-7 bg-[#0F172A] rounded-xl p-6 border border-slate-800 space-y-5 shadow-sm">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-white">
-                    <UploadCloud className="w-4 h-4 text-emerald-400" />
-                    <span>Ingest Signature File</span>
+
+            {/* Scrollable code viewer with line numbers */}
+            <div className="relative rounded-xl bg-[#070A12] border border-[#1E293B] overflow-hidden">
+              <div className="max-h-72 overflow-y-auto p-4 font-mono text-xs leading-relaxed text-slate-300">
+                {fileContent ? (
+                  <pre className="whitespace-pre-wrap break-all font-mono text-[11px] text-cyan-200/90">
+                    {fileContent}
+                  </pre>
+                ) : (
+                  <div className="py-12 text-center text-slate-400">
+                    <FileText className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-xs">No signature file loaded yet.</p>
+                    <p className="text-[11px] mt-0.5">Select a Demo scenario or upload a file above to inspect raw contents.</p>
                   </div>
-                  <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/60 font-medium">
-                    Direct File Ingestion
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 3. SIGNATURE EVIDENCE PANEL */}
+          <div className="p-5 rounded-2xl bg-[#0F172A] border border-[#1E293B] shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#1E293B]">
+              <div className="flex items-center gap-2">
+                <Fingerprint className="w-4 h-4 text-cyan-400" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                  SIGNATURE EVIDENCE
+                </h3>
+              </div>
+              <span className="text-[11px] font-mono text-slate-400">
+                Live State Assessment
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="p-3 rounded-xl bg-[#0A0E17] border border-[#1E293B]">
+                <span className="text-[10px] text-slate-400 uppercase block mb-1">File</span>
+                <span className="font-mono text-white font-semibold truncate block">
+                  {latestResult?.fileName || fileName || 'quantum_signature.sig'}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#0A0E17] border border-[#1E293B]">
+                <span className="text-[10px] text-slate-400 uppercase block mb-1">Integrity</span>
+                <span className={`font-mono font-bold ${
+                  latestResult?.integrityStatus === 'VALID' ? 'text-emerald-400' :
+                  latestResult?.integrityStatus === 'INVALID' ? 'text-rose-400' : 'text-slate-400'
+                }`}>
+                  {latestResult?.integrityStatus || 'NOT CHECKED'}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#0A0E17] border border-[#1E293B]">
+                <span className="text-[10px] text-slate-400 uppercase block mb-1">Identity</span>
+                <span className={`font-mono font-bold ${
+                  latestResult?.identityConsistency === 'MATCH' ? 'text-emerald-400' :
+                  latestResult?.identityConsistency === 'MISMATCH' ? 'text-rose-400' : 'text-slate-400'
+                }`}>
+                  {latestResult?.identityConsistency || (senderIdentity === claimedIdentity && senderIdentity ? 'MATCH' : 'MISMATCH')}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#0A0E17] border border-[#1E293B]">
+                <span className="text-[10px] text-slate-400 uppercase block mb-1">Quantum State</span>
+                <span className="font-mono text-cyan-400 font-bold">
+                  {latestResult?.quantumState || quantumState}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#0A0E17] border border-[#1E293B]">
+                <span className="text-[10px] text-slate-400 uppercase block mb-1">Measurement Basis</span>
+                <span className="font-mono text-cyan-400 font-bold">
+                  {latestResult?.measurementBasis || measurementBasis} Basis
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#0A0E17] border border-[#1E293B]">
+                <span className="text-[10px] text-slate-400 uppercase block mb-1">Nonce Validity</span>
+                <span className={`font-mono font-bold ${
+                  latestResult?.nonceValidity === 'Unique' ? 'text-emerald-400' :
+                  latestResult?.nonceValidity === 'Reused' ? 'text-purple-400' : 'text-slate-400'
+                }`}>
+                  {latestResult?.nonceValidity || 'Unique'}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#0A0E17] border border-[#1E293B]">
+                <span className="text-[10px] text-slate-400 uppercase block mb-1">Measurement</span>
+                <span className={`font-mono font-bold ${
+                  latestResult?.measurementConsistency === 'PASS' ? 'text-emerald-400' :
+                  latestResult?.measurementConsistency === 'FAIL' ? 'text-rose-400' : 'text-slate-400'
+                }`}>
+                  {latestResult?.measurementConsistency || 'PASS'}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#0A0E17] border border-[#1E293B]">
+                <span className="text-[10px] text-slate-400 uppercase block mb-1">Decision Boundary</span>
+                <span className="font-mono text-amber-400 font-bold">
+                  {latestResult?.statisticalThreshold || statisticalThreshold}%
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between p-3 rounded-xl bg-[#0A0E17] border border-[#1E293B]">
+              <span className="text-xs text-slate-300 font-medium">Threat Assessment:</span>
+              <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
+                latestResult?.threatAssessment === 'SAFE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' :
+                latestResult?.threatAssessment === 'SUSPICIOUS' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' :
+                'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+              }`}>
+                {latestResult?.threatAssessment || 'SAFE'}
+              </span>
+            </div>
+          </div>
+
+          {/* 4. VERIFICATION RESULT PANEL (Prominent Detailed Card) */}
+          {latestResult && (
+            <div className={`p-6 rounded-2xl border shadow-2xl space-y-5 transition-all ${
+              latestResult.status === 'VERIFIED'
+                ? 'bg-gradient-to-b from-[#0F172A] to-[#0A1628] border-emerald-500/40'
+                : 'bg-gradient-to-b from-[#1A1016] to-[#0F172A] border-rose-500/40'
+            }`}>
+              {/* Verdict Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#1E293B]">
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    latestResult.status === 'VERIFIED'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                      : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                  }`}>
+                    {latestResult.status === 'VERIFIED' ? <CheckCircle2 className="w-6 h-6" /> : <ShieldAlert className="w-6 h-6" />}
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono tracking-wider uppercase text-slate-400 block">
+                      VERIFICATION DECISION
+                    </span>
+                    <h2 className={`text-xl font-bold tracking-tight font-mono ${
+                      latestResult.status === 'VERIFIED' ? 'text-emerald-400' : 'text-rose-400'
+                    }`}>
+                      {latestResult.status}
+                    </h2>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">Classified Threat:</span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border ${
+                    latestResult.threatType === 'None'
+                      ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800'
+                      : 'bg-rose-950/60 text-rose-300 border-rose-800'
+                  }`}>
+                    {latestResult.threatType.toUpperCase()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Core Metrics Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 rounded-xl bg-[#0A0E17]/80 border border-[#1E293B]">
+                  <span className="text-[10px] text-slate-400 uppercase block">Measurement Mismatch</span>
+                  <div className="flex items-baseline gap-1 mt-0.5">
+                    <span className={`text-base font-mono font-bold ${
+                      latestResult.mismatchRate > latestResult.statisticalThreshold ? 'text-rose-400' : 'text-emerald-400'
+                    }`}>
+                      {latestResult.mismatchRate}%
+                    </span>
+                    <span className="text-[10px] text-slate-400">/ {latestResult.statisticalThreshold}% Cutoff</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-[#0A0E17]/80 border border-[#1E293B]">
+                  <span className="text-[10px] text-slate-400 uppercase block">Attack Probability</span>
+                  <span className={`text-base font-mono font-bold mt-0.5 block ${
+                    latestResult.attackProbability > 50 ? 'text-rose-400' : 'text-emerald-400'
+                  }`}>
+                    {latestResult.attackProbability}%
                   </span>
                 </div>
 
-                {/* Drag & Drop Zone */}
-                <div
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`p-8 border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${
-                    isDragging
-                      ? 'border-blue-500 bg-blue-950/20'
-                      : uploadedFile
-                      ? 'border-emerald-500/60 bg-emerald-950/10'
-                      : 'border-slate-700 hover:border-slate-600 bg-[#0B1120]'
-                  }`}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setUploadedFile(e.target.files[0]);
-                      }
-                    }}
-                  />
-                  {uploadedFile ? (
-                    <div className="space-y-2">
-                      <div className="w-10 h-10 rounded-lg bg-emerald-950 border border-emerald-500/50 flex items-center justify-center text-emerald-400 mx-auto">
-                        <FileCheck2 className="w-5 h-5" />
-                      </div>
-                      <div className="text-sm font-medium text-white font-mono">
-                        {uploadedFile.name}
-                      </div>
-                      <div className="text-xs text-slate-400">
-                        {(uploadedFile.size / 1024).toFixed(1)} KB • {uploadedFile.type || 'Signature payload'}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setUploadedFile(null);
-                        }}
-                        className="text-xs text-rose-400 hover:underline cursor-pointer"
-                      >
-                        Remove file
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 mx-auto">
-                        <UploadCloud className="w-5 h-5" />
-                      </div>
-                      <div className="text-sm font-medium text-slate-200">
-                        Drop signature payload or browse files
-                      </div>
-                      <p className="text-xs text-slate-400">
-                        Accepts .sig, .txt, .pdf, .bin, .json, or encrypted quantum state tokens
-                      </p>
-                    </div>
-                  )}
+                <div className="p-3 rounded-xl bg-[#0A0E17]/80 border border-[#1E293B]">
+                  <span className="text-[10px] text-slate-400 uppercase block">Detection Confidence</span>
+                  <span className="text-base font-mono font-bold text-cyan-400 mt-0.5 block">
+                    {latestResult.attackConfidence}%
+                  </span>
                 </div>
 
-                {/* Signer ID */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Claimed Signer Identity
-                  </label>
-                  <input
-                    type="text"
-                    value={signerId}
-                    onChange={(e) => setSignerId(e.target.value)}
-                    placeholder="ALICE-QDS-ROOT-01"
-                    className="w-full p-2.5 bg-[#0B1120] border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-blue-500 transition-colors"
-                  />
+                <div className="p-3 rounded-xl bg-[#0A0E17]/80 border border-[#1E293B]">
+                  <span className="text-[10px] text-slate-400 uppercase block">Quantum Threat Score</span>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="text-base font-mono font-bold text-white">
+                      {latestResult.quantumThreatScore}
+                    </span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                      latestResult.threatRiskLevel === 'CRITICAL' ? 'bg-rose-950 text-rose-300' :
+                      latestResult.threatRiskLevel === 'HIGH' ? 'bg-amber-950 text-amber-300' :
+                      latestResult.threatRiskLevel === 'MEDIUM' ? 'bg-yellow-950 text-yellow-300' :
+                      'bg-emerald-950 text-emerald-300'
+                    }`}>
+                      {latestResult.threatRiskLevel}
+                    </span>
+                  </div>
                 </div>
-
-                {/* Verifier Terminal */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Verifier Terminal
-                  </label>
-                  <select
-                    value={selectedVerifier}
-                    onChange={(e) => setSelectedVerifier(e.target.value)}
-                    className="w-full p-2.5 bg-[#0B1120] border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500 transition-colors"
-                  >
-                    {verifiers.map((v) => (
-                      <option key={v.verifier_id} value={v.verifier_id}>
-                        {v.verifier_id} ({v.name})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Optional Custom Nonce */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Quantum Nonce (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={customNonce}
-                    onChange={(e) => setCustomNonce(e.target.value)}
-                    placeholder="Leave empty for fresh cryptographic nonce generation"
-                    className="w-full p-2.5 bg-[#0B1120] border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-blue-500 transition-colors"
-                  />
-                </div>
-
-                {/* Submit CTA */}
-                <button
-                  onClick={handleRunLiveVerification}
-                  disabled={isVerifying || !uploadedFile}
-                  className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
-                >
-                  {isVerifying ? (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <FileCheck2 className="w-4 h-4" />
-                      <span>Verify File Signature</span>
-                    </>
-                  )}
-                </button>
               </div>
 
-              {/* Right Ingestion Logic Info */}
-              <div className="lg:col-span-5 bg-[#0F172A] rounded-xl p-6 border border-slate-800 space-y-4 shadow-sm">
-                <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wide flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" /> Teleportation Verification Pipeline
-                </h3>
+              {/* Quantum Pattern Comparison with Visual Mismatch Highlighting */}
+              <div className="p-4 rounded-xl bg-[#0A0E17] border border-[#1E293B] space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-200">Pauli Bitstream Tomography & Mismatch Inspection</span>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    Mismatches: <strong className="text-rose-400">{latestResult.mismatchCount}</strong> / {latestResult.totalMeasurements} bits
+                  </span>
+                </div>
 
-                <div className="space-y-3 text-xs text-slate-400 leading-relaxed">
-                  <div className="p-3 rounded-lg bg-[#0B1120] border border-slate-800 space-y-1">
-                    <strong className="text-slate-200">1. SHA-256 Digest Extraction</strong>
-                    <p className="text-[11px]">
-                      File bytes are hashed to derive the deterministic quantum seed binding document to signature state.
-                    </p>
+                <div className="space-y-1.5 font-mono text-xs">
+                  {/* Expected row */}
+                  <div className="flex items-center gap-2">
+                    <span className="w-16 text-[10px] text-slate-400 shrink-0">Expected:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {latestResult.patternComparison.map((bit) => (
+                        <span
+                          key={`exp-${bit.index}`}
+                          className="w-5 h-6 rounded flex items-center justify-center bg-[#1E293B] text-slate-300 font-bold text-[11px]"
+                        >
+                          {bit.expected}
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[#0B1120] border border-slate-800 space-y-1">
-                    <strong className="text-slate-200">2. Registry Benchmark</strong>
-                    <p className="text-[11px]">
-                      If the file has been enrolled via the "Enroll" tab, the signer basis aligns and verification passes with nominal noise (&lt; 0.05).
-                    </p>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-[#0B1120] border border-slate-800 space-y-1">
-                    <strong className="text-slate-200">3. Tamper & Forgery Detection</strong>
-                    <p className="text-[11px]">
-                      Modified payloads or forged states collapse into random basis measurements, tripping the 5σ threshold (&gt; 0.1120).
-                    </p>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-[#0B1120] border border-slate-800 space-y-1">
-                    <strong className="text-slate-200">4. Nonce Freshness Check</strong>
-                    <p className="text-[11px]">
-                      Replayed nonces or unauthorized verifier terminals are rejected immediately prior to quantum measurement.
-                    </p>
+                  {/* Observed row with highlights */}
+                  <div className="flex items-center gap-2">
+                    <span className="w-16 text-[10px] text-slate-400 shrink-0">Observed:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {latestResult.patternComparison.map((bit) => (
+                        <span
+                          key={`obs-${bit.index}`}
+                          className={`w-5 h-6 rounded flex items-center justify-center font-bold text-[11px] transition-transform ${
+                            bit.isMismatch
+                              ? 'bg-rose-600 text-white shadow-xs shadow-rose-500 scale-105 ring-1 ring-rose-400'
+                              : 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/40'
+                          }`}
+                          title={`Position ${bit.index}: Expected ${bit.expected}, Observed ${bit.observed}`}
+                        >
+                          {bit.observed}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
+
+                <div className="flex items-center gap-4 text-[10px] text-slate-400 pt-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded bg-emerald-900 border border-emerald-600"></span>
+                    Matching Basis Measurement
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded bg-rose-600"></span>
+                    Observed Mismatch / Quantum Disturbance
+                  </span>
+                </div>
+              </div>
+
+              {/* WHY THIS DECISION? Dynamic Explanation Box */}
+              <div className="p-4 rounded-xl bg-[#0A0E17] border border-[#1E293B] space-y-1.5">
+                <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-cyan-400 flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5" />
+                  WHY THIS DECISION?
+                </span>
+                <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                  {latestResult.whyDecision}
+                </p>
+              </div>
+
+              {/* PAULI / QUANTUM REPRESENTATION CARD */}
+              <div className="p-4 rounded-xl bg-[#0A0E17]/80 border border-[#1E293B] space-y-2">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+                  <span className="flex items-center gap-1.5 text-cyan-400">
+                    <Cpu className="w-3.5 h-3.5" />
+                    Pauli Complementarity State Representation
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400">Conceptual Quantum Layer</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono">
+                  <div className="p-2 rounded-lg bg-[#0F172A] border border-[#1E293B]">
+                    <span className="text-cyan-400 font-bold">|0⟩</span> → Z-basis eigenstate
+                  </div>
+                  <div className="p-2 rounded-lg bg-[#0F172A] border border-[#1E293B]">
+                    <span className="text-cyan-400 font-bold">|1⟩</span> → Z-basis eigenstate
+                  </div>
+                  <div className="p-2 rounded-lg bg-[#0F172A] border border-[#1E293B]">
+                    <span className="text-cyan-400 font-bold">|+⟩</span> → X-basis eigenstate
+                  </div>
+                  <div className="p-2 rounded-lg bg-[#0F172A] border border-[#1E293B]">
+                    <span className="text-cyan-400 font-bold">|−⟩</span> → X-basis eigenstate
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 italic">
+                  * Quantum-inspired mathematical model executing locally; represents teleportation channel collapse under unauthorized measurement.
+                </p>
               </div>
             </div>
           )}
-        </>
-      )}
-
-      {/* ENROLL SIGNATURE REFERENCE TAB */}
-      {activeTab === 'REGISTER' && (
-        <div className="max-w-2xl mx-auto bg-[#0F172A] rounded-xl p-6 border border-slate-800 space-y-5 shadow-sm">
-          <div className="border-b border-slate-800 pb-3">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Database className="w-4 h-4 text-blue-400" /> Enroll Legitimate Signature Reference
-            </h2>
-            <p className="text-xs text-slate-400 mt-1">
-              Store a document's SHA-256 hash and Pauli public basis seed into the legitimate registry for future baseline verification.
-            </p>
-          </div>
-
-          <form onSubmit={handleRegisterSignature} className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Reference Document
-              </label>
-              <input
-                ref={regFileInputRef}
-                type="file"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    setRegFile(e.target.files[0]);
-                  }
-                }}
-                className="w-full text-xs text-slate-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 cursor-pointer"
-                required
-              />
-              {regFile && (
-                <div className="text-xs text-blue-400 font-mono mt-1.5">
-                  Selected: {regFile.name} ({(regFile.size / 1024).toFixed(1)} KB)
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Authoritative Signer Identifier
-              </label>
-              <input
-                type="text"
-                value={regSignerId}
-                onChange={(e) => setRegSignerId(e.target.value)}
-                placeholder="ALICE-QDS-ROOT-01"
-                className="w-full p-2.5 bg-[#0B1120] border border-slate-700 rounded-lg text-xs text-white font-mono focus:outline-none focus:border-blue-500 transition-colors"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Operational Description / Notes
-              </label>
-              <textarea
-                value={regDescription}
-                onChange={(e) => setRegDescription(e.target.value)}
-                placeholder="E.g. Tactical order or settlement batch signed via entangled teleportation state."
-                rows={3}
-                className="w-full p-2.5 bg-[#0B1120] border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500 transition-colors"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isRegistering || !regFile}
-              className="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
-            >
-              {isRegistering ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  <FilePlus className="w-4 h-4" />
-                  <span>Enroll in Legitimate Registry</span>
-                </>
-              )}
-            </button>
-          </form>
         </div>
-      )}
+      </div>
     </div>
   );
 };

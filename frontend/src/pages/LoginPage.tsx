@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Eye, EyeOff, Lock, User, AlertCircle, ArrowRight, Check } from 'lucide-react';
+import { ShieldCheck, Eye, EyeOff, Lock, User, AlertCircle, ArrowRight, KeyRound } from 'lucide-react';
 import { CyberBackground } from '../components/CyberBackground';
 
 export const LoginPage: React.FC = () => {
@@ -15,7 +15,7 @@ export const LoginPage: React.FC = () => {
     e.preventDefault();
     setError(null);
     if (!username.trim() || !password) {
-      setError('Please enter both your identifier and passkey.');
+      setError('Please provide your user identifier and password.');
       return;
     }
 
@@ -42,25 +42,26 @@ export const LoginPage: React.FC = () => {
       <div className="relative z-10 w-full max-w-md">
         {/* Emblem & Title */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600/15 border border-blue-500/30 text-blue-400 mb-3 shadow-sm">
-            <ShieldCheck className="w-6 h-6 text-blue-400" />
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 mb-3 shadow-xs">
+            <ShieldCheck className="w-6 h-6 text-cyan-400" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-white mb-1">
-            QuantGuard Defense Console
+          <h1 className="text-2xl font-bold tracking-wider font-mono text-white mb-1 uppercase">
+            QUANTGUARD
           </h1>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            Teleportation-Based Quantum Digital Signature (QDS) Verification Platform
+            Quantum-Inspired Cyber Threat Detection
           </p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-[#0F172A] rounded-xl p-6 border border-slate-800 shadow-xl">
-          <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-800">
-            <span className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
-              Operator Access
+        <div className="bg-[#0F172A] rounded-2xl p-6 border border-[#1E293B] shadow-2xl">
+          <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-[#1E293B]">
+            <span className="text-xs font-semibold text-slate-300 uppercase tracking-wide flex items-center gap-2">
+              <KeyRound className="w-3.5 h-3.5 text-cyan-400" />
+              Terminal Authentication
             </span>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-              Clearance Level 5
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#1E293B] text-slate-300 border border-[#334155]">
+              Prototype Demo
             </span>
           </div>
 
@@ -74,7 +75,7 @@ export const LoginPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Operator Identifier
+                User ID
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -85,7 +86,7 @@ export const LoginPage: React.FC = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="admin"
-                  className="w-full pl-9 pr-3 py-2 bg-[#0B1120] border border-slate-700/80 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors font-mono"
+                  className="w-full pl-9 pr-3 py-2.5 bg-[#0A0E17] border border-[#1E293B] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors font-mono"
                   required
                 />
               </div>
@@ -93,7 +94,7 @@ export const LoginPage: React.FC = () => {
 
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Security Passkey
+                Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -104,7 +105,7 @@ export const LoginPage: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full pl-9 pr-10 py-2 bg-[#0B1120] border border-slate-700/80 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors font-mono"
+                  className="w-full pl-9 pr-10 py-2.5 bg-[#0A0E17] border border-[#1E293B] rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors font-mono"
                   required
                 />
                 <button
@@ -117,16 +118,16 @@ export const LoginPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Demo Credentials Helper */}
-            <div className="p-3 rounded-lg bg-[#0B1120] border border-slate-800 text-xs text-slate-300 flex items-center justify-between">
+            {/* Demo Credentials Helper Card */}
+            <div className="p-3 rounded-xl bg-[#0A0E17] border border-[#1E293B] text-xs text-slate-300 flex items-center justify-between">
               <div>
                 <span className="text-slate-400">Evaluation: </span>
-                <span className="font-mono text-blue-400 font-semibold">admin</span> / <span className="font-mono text-slate-300">QuantGuard@2026</span>
+                <span className="font-mono text-cyan-400 font-semibold">admin</span> / <span className="font-mono text-slate-300">QuantGuard@2026</span>
               </div>
               <button
                 type="button"
                 onClick={handleFillDemo}
-                className="text-xs text-blue-400 hover:text-blue-300 font-medium cursor-pointer"
+                className="text-xs text-cyan-400 hover:text-cyan-300 font-medium cursor-pointer"
               >
                 Autofill
               </button>
@@ -135,13 +136,13 @@ export const LoginPage: React.FC = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-600 via-sky-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg shadow-cyan-600/25"
             >
               {isSubmitting ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>Sign In to Console</span>
+                  <span>Sign In</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -149,9 +150,9 @@ export const LoginPage: React.FC = () => {
           </form>
 
           {/* Compliance & Technical Protocol Footer */}
-          <div className="mt-5 pt-4 border-t border-slate-800 text-center">
+          <div className="mt-5 pt-4 border-t border-[#1E293B] text-center">
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Protected under the Quantum No-Cloning Theorem · 5σ Statistical Calibrated Boundary
+              Protected under the Quantum No-Cloning Theorem · Local Prototype Verification Workflow
             </p>
           </div>
         </div>

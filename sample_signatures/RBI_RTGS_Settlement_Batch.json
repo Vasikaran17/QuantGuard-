@@ -1,0 +1,19 @@
+{
+  "signatureId": "SIG-RTGS-9941-QDS",
+  "senderIdentity": "ALICE-QDS-NODE-01",
+  "claimedIdentity": "ALICE-QDS-NODE-01",
+  "quantumState": "|0⟩",
+  "measurementBasis": "Z Basis",
+  "nonce": "NONCE-RTGS-BANK-SETTLEMENT-2026",
+  "measurementSamples": 16,
+  "expectedPattern": "0 1 0 1 0 1 0 1 1 0 1 0 0 1 1 0",
+  "observedPattern": "0 1 0 1 0 1 0 1 1 0 1 0 0 1 1 0",
+  "authorizationStatus": "AUTHORIZED",
+  "timestamp": "2026-09-30T04:30:00Z",
+  "verificationData": {
+    "settlementBatchId": "BATCH-SETTLE-INR-992104",
+    "clearingHouse": "Reserve Bank Teleportation Relay",
+    "grossAmountINR": "48,500,000,000",
+    "channelFidelity": "99.2%"
+  }
+}
